@@ -57,4 +57,4 @@ CREATE TABLE IF NOT EXISTS content.person_film_work
 
 -- Создадим уникальный композитный индекс film_work_person для таблицы person_film_work так,
 -- чтобы нельзя было добавить одного актёра несколько раз к одному фильму.
-CREATE UNIQUE INDEX film_work_person ON content.person_film_work (film_work_id, person_id);
+CREATE UNIQUE INDEX film_work_person ON content.person_film_work (id, film_work_id, person_id);
