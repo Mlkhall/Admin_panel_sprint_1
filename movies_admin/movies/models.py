@@ -1,16 +1,12 @@
 import uuid
 
 from django.db import models
+from django.db.models import UniqueConstraint, Q
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-# Create your models here.
-
 
 class TimeStampedModel(models.Model):
-    # В созданных вами таблицах есть поля created_at и updated_at.
-    # Чтобы не повторять эти две строки в каждой модели,
-    # создадим класс-миксин.
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -35,14 +31,11 @@ class Person(TimeStampedModel):
 class Genre(TimeStampedModel):
     id = models.TextField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_('Название'), max_length=255)
-    # name = models.CharField(_('sandwich'), max_length=255)
-    # blank=True делает поле необязательным для заполнения.
     description = models.TextField(_('Описание'), blank=True)
 
     class Meta:
         verbose_name = _('Жанр')
         verbose_name_plural = _('Жанры')
-        # Ваши таблицы находятся в нестандартной схеме. Это тоже нужно указать в классе модели
         db_table = "content\".\"genre"
 
     def __str__(self):
@@ -76,6 +69,14 @@ class PersonFilmWork(models.Model):
         verbose_name = _('Персона')
         verbose_name_plural = _('Лица')
         db_table = "content\".\"person_film_work"
+        constraints = [
+            UniqueConstraint(
+                fields=['id', 'film_work_id', 'person_id'],
+                name="film_work_person"),
+            UniqueConstraint(
+                fields=['id'],
+                name="person_film_work_pkey")
+        ]
 
     def __str__(self):
         return 'Личность'
