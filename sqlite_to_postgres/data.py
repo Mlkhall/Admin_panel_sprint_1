@@ -62,5 +62,12 @@ class Data:
     person_film_work: Optional
 
 
+tb_names_and_data = {
+    'film_work': FilmWork,
+    'genre': Genre,
+    'genre_film_work': GenreFilmWork,
+    'person': Person,
+    'person_film_work': PersonFilmWork
+}
 
 

@@ -2,6 +2,7 @@ certifi==2021.10.8
 charset-normalizer==2.0.7
 connection==2021.7.20
 idna==3.3
+loguru==0.5.3
 psycopg2-binary==2.9.1
 requests==2.26.0
 urllib3==1.26.7

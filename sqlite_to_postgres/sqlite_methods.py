@@ -1,5 +1,6 @@
 import sqlite3
-from data import FilmWork, Genre, GenreFilmWork, Person, PersonFilmWork, Data
+from data import Data, tb_names_and_data
+from loguru import logger
 
 
 def process_func(row):
@@ -9,119 +10,48 @@ def process_func(row):
         return row if row is not None else 'Null'
 
 
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
+
 class SQLiteLoader:
-    def __init__(self, connection: sqlite3.Connection):
-        self.conn = connection
-        self.cursor = self.conn.cursor()
+    def __init__(self, sqlite_cursor: sqlite3.Connection.cursor,
+                 sqlite_connect: sqlite3.Connection):
+        self.cursor = sqlite_cursor
+        sqlite_cursor.row_factory = dict_factory
+        self.conn = sqlite_connect
 
-    def get_film_work(self):
-        sqlite_select_all_values = """
-                                    SELECT * FROM film_work;
-                                    """
+    def get_data_from_table(self, table_name: str, data_class):
 
-        self.cursor.execute(sqlite_select_all_values)
+        sqlite_get_count_values = f"""
+                                          SELECT Count(*) AS len_tb FROM {table_name}
+                                          """
 
-        processed_rows = (tuple(map(process_func, row)) for row in self.cursor.fetchall())
+        sqlite_select_all_values = f"""
+                                            SELECT * FROM {table_name};
+                                            """
 
-        film_work = (FilmWork(id=row[0],
-                              title=row[1],
-                              description=row[2],
-                              creation_date=row[3],
-                              certificate=row[4],
-                              file_path=row[5],
-                              rating=row[6],
-                              type=row[7],
-                              created_at=row[8],
-                              updated_at=row[9]
-                              ) for row in processed_rows)
+        self.cursor.execute(sqlite_get_count_values)
+        limit = self.cursor.fetchone()['len_tb']
 
-        print("[INFO] SQLite data from film_work was loaded")
-        return film_work
-
-    def get_genre(self):
-        sqlite_select_all_values = """
-                                    SELECT * FROM genre;
-                                    """
+        self.conn.commit()
 
         self.cursor.execute(sqlite_select_all_values)
 
-        processed_rows = (tuple(map(process_func, row)) for row in self.cursor.fetchall())
+        processed_rows = (self.cursor.fetchone() for _ in range(limit))
 
-        genre = (Genre(id=row[0],
-                       name=row[1],
-                       description=row[2],
-                       created_at=row[3],
-                       updated_at=row[4],
-                       ) for row in processed_rows)
+        current_data = (data_class(**row) for row in processed_rows)
 
-        print("[INFO] SQLite data from genre was loaded")
-        return genre
+        logger.info(f"SQLite data from {table_name} was loaded")
 
-    def get_genre_film_work(self):
-        sqlite_select_all_values = """
-                                    SELECT * FROM genre_film_work;
-                                    """
+        return current_data
 
-        self.cursor.execute(sqlite_select_all_values)
+    def load_movies(self, data_tb=tb_names_and_data):
+        data = {tb_name: tuple(self.get_data_from_table(tb_name, data_tb[tb_name])) for tb_name in data_tb}
 
-        processed_rows = (tuple(map(process_func, row)) for row in self.cursor.fetchall())
+        return Data(**data)
 
-        genre_film_work = (GenreFilmWork(id=row[0],
-                                         film_work_id=row[1],
-                                         genre_id=row[2],
-                                         created_at=row[3],
-                                         ) for row in processed_rows)
 
-        print("[INFO] SQLite data from genre_film_work was loaded")
-        return genre_film_work
-
-    def get_person(self):
-        sqlite_select_all_values = """
-                                    SELECT * FROM person;
-                                    """
-
-        self.cursor.execute(sqlite_select_all_values)
-
-        processed_rows = (tuple(map(process_func, row)) for row in self.cursor.fetchall())
-
-        person = (Person(id=row[0],
-                         full_name=row[1],
-                         birth_date=row[2],
-                         created_at=row[3],
-                         updated_at=row[4]
-                         ) for row in processed_rows)
-
-        print("[INFO] SQLite data from person was loaded")
-        return person
-
-    def get_person_film_work(self):
-        sqlite_select_all_values = """
-                                    SELECT * FROM person_film_work;
-                                    """
-
-        self.cursor.execute(sqlite_select_all_values)
-
-        processed_rows = (tuple(map(process_func, row)) for row in self.cursor.fetchall())
-
-        person_film_work = (PersonFilmWork(id=row[0],
-                                           film_work_id=row[1],
-                                           person_id=row[2],
-                                           role=row[3],
-                                           created_at=row[4]
-                                           ) for row in processed_rows)
-
-        print("[INFO] SQLite data from person_film_work was loaded")
-        return person_film_work
-
-    def load_movies(self):
-        film_work = self.get_film_work()
-        genre = self.get_genre()
-        genre_film_work = self.get_genre_film_work()
-        person = self.get_person()
-        person_film_work = self.get_person_film_work()
-
-        return Data(film_work=film_work,
-                    genre=genre,
-                    genre_film_work=genre_film_work,
-                    person=person,
-                    person_film_work=person_film_work)

@@ -1,4 +1,6 @@
 from psycopg2.extensions import connection as _connection
+from psycopg2.extras import execute_values
+from loguru import logger
 
 
 class PostgresSaver:
@@ -6,129 +8,42 @@ class PostgresSaver:
         self.conn = pg_conn
         self.cursor = self.conn.cursor()
 
-    def save_data_film_work(self, film_work):
-        sql_insert_query = \
+    def save_data(self, table_name, data_class):
+        sql_get_columns_names = \
+            f"""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = '{table_name}';
             """
-            INSERT INTO movies_test.content.film_work
-            (id, title, description, creation_date, certificate, file_path, rating, type, created_at, updated_at)
-            VALUES ('%s', '%s', '%s', %s, %s, %s, %s, '%s', '%s', '%s')
+
+        self.cursor.execute(sql_get_columns_names)
+        columns_names = tuple(map(lambda name: name[0], self.cursor.fetchall()))
+        self.conn.commit()
+
+        sql_insert_req = \
+            f"""
+            INSERT INTO movies_test.content.{table_name}
+            {columns_names}
+            VALUES %s
             ON CONFLICT (id) DO NOTHING;
-            """
+            """.replace("'", '')
 
-        for row_film_work in film_work:
-            adding_row = (
-                row_film_work.id,
-                row_film_work.title,
-                row_film_work.description,
-                row_film_work.creation_date,
-                row_film_work.certificate,
-                row_film_work.file_path,
-                row_film_work.rating,
-                row_film_work.type,
-                row_film_work.created_at,
-                row_film_work.updated_at,
-            )
+        inserting_rows = []
+        for row_from_data_class in data_class:
+            row_dict = row_from_data_class.__dict__
+            adding_row = tuple((row_dict[col] for col in columns_names))
+            inserting_rows.append(adding_row)
 
-            self.cursor.execute(sql_insert_query % adding_row)
-            self.conn.commit()
+        execute_values(self.cursor, sql_insert_req, inserting_rows)
+        self.conn.commit()
 
-        print("[INFO] PostgreSQL data from film_work was saved")
-
-    def save_genre(self, genre):
-        sql_insert_query = \
-            """
-            INSERT INTO movies_test.content.genre
-            (id, name, description, created_at, updated_at)
-            VALUES ('%s', '%s', '%s', '%s', '%s')
-            ON CONFLICT (id) DO NOTHING;
-            """
-
-        for row_genre in genre:
-            adding_row = (
-                row_genre.id,
-                row_genre.name,
-                row_genre.description,
-                row_genre.created_at,
-                row_genre.updated_at,
-            )
-
-            self.cursor.execute(sql_insert_query % adding_row)
-            self.conn.commit()
-
-        print("[INFO] PostgreSQL data from genre was saved")
-
-    def save_genre_film_work(self, genre_film_work):
-        sql_insert_query = \
-            """
-            INSERT INTO movies_test.content.genre_film_work
-            (id, film_work_id, genre_id, created_at)
-            VALUES ('%s', '%s', '%s', '%s')
-            ON CONFLICT (id) DO NOTHING;
-            """
-
-        for row_genre_film_work in genre_film_work:
-            adding_row = (
-                row_genre_film_work.id,
-                row_genre_film_work.film_work_id,
-                row_genre_film_work.genre_id,
-                row_genre_film_work.created_at,
-            )
-
-            self.cursor.execute(sql_insert_query % adding_row)
-            self.conn.commit()
-
-        print("[INFO] PostgreSQL data from row_genre_film_work was saved")
-
-    def save_person(self, person):
-        sql_insert_query = \
-            """
-            INSERT INTO movies_test.content.person
-            (id, full_name, birth_date, created_at, updated_at)
-            VALUES ('%s', '%s', %s, '%s', '%s')
-            ON CONFLICT (id) DO NOTHING;
-            """
-
-        for row_person in person:
-            adding_row = (
-                row_person.id,
-                row_person.full_name,
-                row_person.birth_date,
-                row_person.created_at,
-                row_person.updated_at,
-            )
-            self.cursor.execute(sql_insert_query % adding_row)
-            self.conn.commit()
-
-        print("[INFO] PostgreSQL data from row_genre_film_work was saved")
-
-    def save_person_film_work(self, person_film_work):
-        sql_insert_query = \
-            """
-            INSERT INTO movies_test.content.person_film_work
-            (id, film_work_id, person_id, role, created_at)
-            VALUES ('%s', '%s', '%s', '%s', '%s')
-            ON CONFLICT (film_work_id, person_id) DO NOTHING
-            """
-        for row_person_film_work in person_film_work:
-            adding_row = (
-                row_person_film_work.id,
-                row_person_film_work.film_work_id,
-                row_person_film_work.person_id,
-                row_person_film_work.role,
-                row_person_film_work.created_at,
-            )
-
-            self.cursor.execute(sql_insert_query % adding_row)
-            self.conn.commit()
-
-        print("[INFO] PostgreSQL data from row_genre_film_work was saved")
+        logger.info(f"PostgreSQL data from {table_name} was saved")
 
     def save_all_data(self, data):
-        self.save_data_film_work(data.film_work)
-        self.save_genre(data.genre)
-        self.save_genre_film_work(data.genre_film_work)
-        self.save_person(data.person)
-        self.save_person_film_work(data.person_film_work)
+        data_dictionary = data.__dict__
+        for tab_name in data_dictionary:
+            self.save_data(table_name=tab_name, data_class=data_dictionary[tab_name])
+
 
 
 
